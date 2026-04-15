@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>For You 💖</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Dancing+Script:wght@400;500;600;700&family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════
+   ROOT & RESET
+══════════════════════════════════ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --rose:    #ff4f87;
+  --pink:    #ff85b3;
+  --blush:   #ffc2d8;
+  --purple:  #9b4dca;
+  --violet:  #6c3fc5;
+  --lavender:#c5a8e8;
+  --deep:    #0e0618;
+  --midnight:#160c2a;
+  --ink:     #1e1035;
+  --gold:    #f5c842;
+  --cream:   #fff4f9;
+  --muted:   rgba(255,255,255,0.55);
+  --dim:     rgba(255,255,255,0.28);
+}
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--deep);
+  font-family: 'Jost', sans-serif;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  cursor: default;
+}
+button { cursor: pointer; font-family: 'Jost', sans-serif; }
+
+/* ══════════════════════════════════
+   CANVAS LAYERS
+══════════════════════════════════ */
+#canvas-bg,
+#canvas-confetti {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; z-index: 0;
+}
+#canvas-confetti { z-index: 999; display: none; }
+
+/* ══════════════════════════════════
+   PAGES
+══════════════════════════════════ */
+.page {
+  position: fixed; inset: 0;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: flex-start;
+  overflow-y: auto; overflow-x: hidden;
+  z-index: 10;
+}
+.page.active { display: flex; }
+
+/* PAGE TRANSITIONS */
+@keyframes pgIn  { from { opacity:0; transform:translateY(28px) } to { opacity:1; transform:translateY(0) } }
+@keyframes pgOut { from { opacity:1; transform:translateY(0) } to { opacity:0; transform:translateY(-24px) } }
+.pg-in  { animation: pgIn  0.72s cubic-bezier(0.22,1,0.36,1) forwards; }
+.pg-out { animation: pgOut 0.55s cubic-bezier(0.55,0,1,0.45) forwards; }
+
+/* ══════════════════════════════════
+   NAV DOTS
+══════════════════════════════════ */
+#nav-dots {
+  position: fixed; right: 14px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 9px; z-index: 200;
+}
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35);
+  cursor: pointer; transition: all 0.3s;
+}
+.dot.on { background: var(--rose); border-color: var(--pink); transform: scale(1.45); }
+.dot:hover:not(.on) { background: rgba(255,255,255,0.45); }
+
+/* ══════════════════════════════════
+   MUSIC PLAYER
+══════════════════════════════════ */
+#musicPlayer {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  width: calc(100% - 36px); max-width: 420px;
+  background: rgba(14,6,24,0.82);
+  border: 1px solid rgba(255,107,157,0.25);
+  border-radius: 22px; padding: 14px 16px 12px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,107,157,0.1);
+  z-index: 200; display: none;
+  flex-direction: column; gap: 10px;
+  transition: all 0.4s cubic-bezier(0.22,1,0.36,1);
+}
+#musicPlayer.visible { display: flex; animation: playerSlideUp 0.5s cubic-bezier(0.22,1,0.36,1) forwards; }
+@keyframes playerSlideUp { from{opacity:0;transform:translateX(-50%) translateY(20px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+/* album art + song info row */
+.mp-top { display: flex; align-items: center; gap: 12px; }
+.mp-art {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--rose), var(--violet));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; position: relative; overflow: hidden;
+}
+.mp-art-spin {
+  position: absolute; inset: 0; border-radius: 12px;
+  background: conic-gradient(from 0deg, transparent 270deg, rgba(255,255,255,0.15) 360deg);
+  animation: artSpin 3s linear infinite; display: none;
+}
+.mp-art-spin.on { display: block; }
+@keyframes artSpin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+.mp-info { flex: 1; min-width: 0; }
+.mp-song { font-size: 14px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-artist { font-size: 11px; color: var(--dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-close { background: none; border: none; color: var(--dim); font-size: 18px; line-height: 1; padding: 4px; flex-shrink:0; }
+.mp-close:hover { color: #fff; }
+
+/* progress bar */
+.mp-prog-wrap {
+  width: 100%; height: 3px; background: rgba(255,255,255,0.1);
+  border-radius: 10px; cursor: pointer; position: relative;
+}
+.mp-prog-fill {
+  height: 100%; border-radius: 10px; width: 0%;
+  background: linear-gradient(90deg, var(--rose), var(--violet));
+  transition: width 0.25s linear; pointer-events: none;
+}
+.mp-times { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); margin-top: 3px; }
+
+/* controls row */
+.mp-controls { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.mp-ctrl { background: none; border: none; color: rgba(255,255,255,0.7); font-size: 20px; padding: 4px; transition: all 0.2s; line-height: 1; }
+.mp-ctrl:hover { color: #fff; transform: scale(1.15); }
+.mp-play {
+  width: 44px; height: 44px; border-radius: 50%; border: none;
+  background: linear-gradient(135deg, var(--rose), var(--violet));
+  color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 18px rgba(255,79,135,0.45); transition: all 0.25s;
+}
+.mp-play:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(255,79,135,0.65); }
+.mp-vol { display: flex; align-items: center; gap: 6px; }
+.mp-vol-icon { font-size: 13px; color: var(--dim); }
+.mp-vol input[type=range] {
+  -webkit-appearance: none; width: 60px; height: 3px;
+  background: rgba(255,255,255,0.15); border-radius: 10px; outline: none; cursor: pointer;
+}
+.mp-vol input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--pink); cursor: pointer;
+}
+
+/* song list pill */
+.mp-playlist { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.mp-playlist::-webkit-scrollbar { display: none; }
+.mp-pill {
+  flex-shrink: 0; padding: 5px 14px; border-radius: 100px; font-size: 11px;
+  border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.6); cursor: pointer; transition: all 0.25s; white-space: nowrap;
+}
+.mp-pill.on { background: rgba(255,79,135,0.25); border-color: rgba(255,107,157,0.5); color: #fff; }
+.mp-pill:hover:not(.on) { border-color: rgba(255,255,255,0.35); color: #fff; }
+
+/* mini fab when player is hidden */
+#musicFab {
+  position: fixed; bottom: 22px; right: 16px;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: linear-gradient(135deg,var(--rose),var(--violet));
+  border: none; color: #fff; font-size: 19px;
+  box-shadow: 0 4px 18px rgba(255,79,135,0.45);
+  z-index: 201; transition: all 0.3s; display: none;
+  align-items: center; justify-content: center;
+}
+#musicFab:hover { transform: scale(1.1); }
+
+/* ══════════════════════════════════
+   SHARED COMPONENTS
+══════════════════════════════════ */
+.serif  { font-family: 'Cormorant Garamond', serif; }
+.script { font-family: 'Dancing Script', cursive; }
+
+.pill-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 36px; border-radius: 100px; border: none;
+  background: linear-gradient(135deg, var(--rose), var(--violet));
+  color: #fff; font-size: 15px; font-weight: 500;
+  letter-spacing: 0.5px;
+  box-shadow: 0 6px 28px rgba(255,79,135,0.38);
+  transition: all 0.3s;
+}
+.pill-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 36px rgba(255,79,135,0.52); }
+.pill-btn:active { transform: translateY(0); }
+
+.ghost-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 28px; border-radius: 100px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.8); font-size: 14px;
+  transition: all 0.3s; backdrop-filter: blur(8px);
+}
+.ghost-btn:hover { border-color: var(--pink); color: #fff; background: rgba(255,107,157,0.12); }
+
+.sec-label {
+  font-family: 'Jost', sans-serif;
+  font-size: 10px; font-weight: 500;
+  letter-spacing: 4px; text-transform: uppercase;
+  color: var(--lavender); margin-bottom: 10px;
+}
+.sec-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(28px, 6vw, 44px); font-weight: 300;
+  line-height: 1.15; color: #fff;
+}
+.sec-title em { font-style: italic; color: var(--blush); }
+
+/* ══════════════════════════════════
+   PAGE 1 — LANDING
+══════════════════════════════════ */
+#p1 {
+  background: radial-gradient(ellipse at 30% 20%, #2d0a4e 0%, transparent 60%),
+              radial-gradient(ellipse at 75% 80%, #4a0e2e 0%, transparent 55%),
+              var(--deep);
+  justify-content: center;
+}
+.p1-wrap {
+  text-align: center; padding: 2.5rem 1.8rem;
+  max-width: 440px; width: 100%;
+}
+.p1-heartring {
+  position: relative; width: 90px; height: 90px;
+  margin: 0 auto 2rem;
+}
+.p1-heartring svg { width: 90px; height: 90px; animation: hbeat 1.6s ease-in-out infinite; }
+@keyframes hbeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+
+.p1-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(22px, 5.5vw, 34px); font-weight: 300;
+  line-height: 1.45; color: #fff; margin-bottom: 0.4rem;
+}
+.p1-sub {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic; font-size: clamp(16px, 4vw, 22px);
+  color: var(--lavender); margin-bottom: 2.8rem;
+}
+.p1-input-wrap { position: relative; margin-bottom: 1.2rem; }
+.p1-input {
+  width: 100%; padding: 15px 22px; border-radius: 100px;
+  border: 1.5px solid rgba(255,107,157,0.3);
+  background: rgba(255,255,255,0.07);
+  color: #fff; font-size: 16px; text-align: center;
+  outline: none; transition: all 0.35s;
+  letter-spacing: 1.5px; font-family: 'Jost', sans-serif;
+}
+.p1-input::placeholder { color: rgba(255,255,255,0.32); }
+.p1-input:focus { border-color: var(--pink); background: rgba(255,255,255,0.1); box-shadow: 0 0 0 4px rgba(255,107,157,0.12); }
+.p1-tease {
+  min-height: 24px; font-size: 13.5px; font-style: italic;
+  color: var(--blush); transition: all 0.4s; margin-top: 1rem;
+}
+.p1-secret {
+  margin-top: 2.5rem; font-size: 10px; letter-spacing: 5px;
+  color: rgba(255,255,255,0.1); transition: color 0.5s; cursor: pointer;
+}
+.p1-secret:hover { color: rgba(255,255,255,0.35); }
+
+/* ══════════════════════════════════
+   PAGE 2 — QUIZ
+══════════════════════════════════ */
+#p2 {
+  background: radial-gradient(ellipse at 20% 60%, #1e0a4a 0%, transparent 55%),
+              radial-gradient(ellipse at 80% 20%, #3d0f3d 0%, transparent 50%),
+              var(--midnight);
+}
+.p2-wrap {
+  padding: 3.5rem 1.8rem 5rem; max-width: 480px; width: 100%;
+}
+.p2-progress-bg {
+  height: 3px; border-radius: 10px; background: rgba(255,255,255,0.1);
+  margin-bottom: 2.5rem; overflow: hidden;
+}
+.p2-progress-fill {
+  height: 100%; border-radius: 10px;
+  background: linear-gradient(90deg, var(--rose), var(--violet));
+  transition: width 0.6s cubic-bezier(0.22,1,0.36,1);
+}
+.p2-qcount { color: var(--dim); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 0.8rem; }
+.p2-q {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(20px, 5vw, 30px); font-weight: 400;
+  line-height: 1.4; color: #fff; margin-bottom: 2rem;
+}
+.p2-opts { display: flex; flex-direction: column; gap: 11px; }
+.p2-opt {
+  padding: 15px 20px; border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.85); font-size: 15px;
+  text-align: left; transition: all 0.28s;
+}
+.p2-opt:hover { border-color: rgba(255,107,157,0.5); background: rgba(255,107,157,0.08); color: #fff; }
+.p2-opt.right { border-color: #4ecdc4; background: rgba(78,205,196,0.1); color: #4ecdc4; }
+.p2-opt.wrong { border-color: #ff7b7b; background: rgba(255,107,107,0.1); color: #ff9999; }
+.p2-feedback {
+  min-height: 28px; margin-top: 1.3rem;
+  font-family: 'Cormorant Garamond', serif; font-size: 18px; font-style: italic;
+  text-align: center; transition: all 0.4s;
+}
+.p2-next { margin-top: 1.5rem; display: none; text-align: center; }
+
+/* ══════════════════════════════════
+   PAGE 3 — MEMORY LANE
+══════════════════════════════════ */
+#p3 {
+  background: radial-gradient(ellipse at 50% 0%, #200c40 0%, transparent 60%),
+              radial-gradient(ellipse at 20% 100%, #2d0a20 0%, transparent 55%),
+              var(--midnight);
+}
+.p3-wrap { padding: 3rem 1.8rem 6rem; max-width: 500px; width: 100%; }
+.p3-header { text-align: center; margin-bottom: 3.5rem; }
+
+.mem-item {
+  display: flex; gap: 18px; margin-bottom: 3rem;
+  opacity: 0; transform: translateY(22px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+.mem-item.vis { opacity: 1; transform: translateY(0); }
+.mem-spine { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; padding-top: 4px; }
+.mem-dot-outer {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--rose), var(--violet));
+  box-shadow: 0 0 14px rgba(255,107,157,0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.mem-dot-inner { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: 0.9; }
+.mem-line { width: 1.5px; flex: 1; min-height: 50px; background: linear-gradient(180deg,rgba(255,107,157,0.35),transparent); }
+.mem-body { flex: 1; }
+.mem-when { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--dim); margin-bottom: 7px; }
+.mem-title { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 400; color: #fff; line-height: 1.45; margin-bottom: 6px; }
+.mem-note { font-size: 13px; color: rgba(195,168,232,0.75); line-height: 1.6; margin-bottom: 10px; }
+.mem-emo { font-size: 26px; }
+.mem-photo {
+  margin-top: 10px; width: 100%; height: 100px; border-radius: 12px;
+  border: 1.5px dashed rgba(255,107,157,0.25);
+  background: linear-gradient(135deg,rgba(255,107,157,0.06),rgba(155,89,182,0.06));
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.2); font-size: 11px; letter-spacing: 2px;
+}
+
+/* ══════════════════════════════════
+   PAGE 4 — TEASING
+══════════════════════════════════ */
+#p4 {
+  background: radial-gradient(ellipse at 70% 30%, #1a053a 0%, transparent 55%),
+              radial-gradient(ellipse at 20% 80%, #2d0f1a 0%, transparent 55%),
+              var(--deep);
+}
+.p4-wrap { padding: 3rem 1.8rem 6rem; max-width: 500px; width: 100%; }
+.p4-header { text-align: center; margin-bottom: 3rem; }
+.p4-section { margin-bottom: 2.5rem; }
+.p4-sec-head {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px; font-style: italic;
+  color: #fff; margin-bottom: 1.2rem; text-align: center;
+}
+.cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.lcard {
+  padding: 18px 14px; border-radius: 16px; text-align: center;
+  border: 1.5px solid rgba(255,107,157,0.18);
+  background: rgba(255,107,157,0.05);
+  transition: all 0.32s;
+}
+.lcard:hover { transform: translateY(-5px); border-color: rgba(255,107,157,0.5); background: rgba(255,107,157,0.12); box-shadow: 0 10px 30px rgba(255,79,135,0.2); }
+.rcard {
+  padding: 18px 14px; border-radius: 16px; text-align: center;
+  border: 1.5px solid rgba(155,77,202,0.2);
+  background: rgba(155,77,202,0.05);
+  transition: all 0.32s;
+}
+.rcard:hover { transform: translateY(-5px); border-color: rgba(155,77,202,0.5); background: rgba(155,77,202,0.12); box-shadow: 0 10px 30px rgba(108,63,197,0.2); }
+.card-emo { font-size: 30px; display: block; margin-bottom: 9px; }
+.card-txt { font-size: 13px; color: rgba(255,255,255,0.82); line-height: 1.45; }
+
+/* ══════════════════════════════════
+   PAGE 5 — SURPRISE
+══════════════════════════════════ */
+#p5 {
+  background: radial-gradient(ellipse at 50% 40%, #230a4a 0%, transparent 65%),
+              radial-gradient(ellipse at 20% 80%, #4a0e2d 0%, transparent 50%),
+              var(--midnight);
+  justify-content: center;
+}
+.p5-wrap { text-align: center; padding: 2.5rem 1.8rem; max-width: 460px; width: 100%; }
+.p5-pre { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--dim); margin-bottom: 1.8rem; }
+.p5-bigbtn {
+  padding: 22px 52px; border-radius: 100px; border: none;
+  background: linear-gradient(135deg, var(--rose), var(--violet));
+  color: #fff; font-size: 18px; font-weight: 500;
+  font-family: 'Jost', sans-serif;
+  box-shadow: 0 8px 36px rgba(255,79,135,0.45);
+  animation: btnpulse 2.2s ease-in-out infinite;
+  transition: transform 0.3s;
+}
+.p5-bigbtn:hover { transform: scale(1.05); }
+@keyframes btnpulse {
+  0%,100% { box-shadow: 0 8px 36px rgba(255,79,135,0.45); }
+  50%      { box-shadow: 0 8px 58px rgba(255,79,135,0.72); }
+}
+.p5-hint { margin-top: 0.9rem; font-size: 12px; color: var(--dim); font-style: italic; }
+.p5-reveal { display: none; }
+@keyframes revealIn { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+.p5-reveal.show { display: block; animation: revealIn 0.8s cubic-bezier(0.22,1,0.36,1) forwards; }
+.p5-glow {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(30px, 8vw, 52px); font-weight: 600;
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(245,200,66,0.65);
+  animation: glowpulse 2.5s ease-in-out infinite;
+  margin-bottom: 1.5rem;
+}
+@keyframes glowpulse {
+  0%,100% { text-shadow: 0 0 25px rgba(245,200,66,0.6); }
+  50%      { text-shadow: 0 0 55px rgba(245,200,66,0.9), 0 0 80px rgba(255,107,157,0.35); }
+}
+.p5-msg {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(17px, 4.5vw, 24px); font-weight: 300;
+  line-height: 1.75; color: rgba(255,255,255,0.9);
+  margin-bottom: 2rem;
+}
+
+/* ══════════════════════════════════
+   PAGE 6 — LOVE LETTER
+══════════════════════════════════ */
+#p6 {
+  background: radial-gradient(ellipse at 30% 20%, #1a0a3d 0%, transparent 60%),
+              radial-gradient(ellipse at 75% 85%, #2d0f2d 0%, transparent 55%),
+              var(--deep);
+}
+.p6-wrap { padding: 3rem 1.8rem 6rem; max-width: 520px; width: 100%; }
+.p6-header { text-align: center; margin-bottom: 2.5rem; }
+.letter-card {
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(255,107,157,0.18);
+  border-radius: 22px; padding: 2.2rem 1.8rem;
+  backdrop-filter: blur(10px);
+}
+.letter-stamp {
+  font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 1.8rem;
+}
+.letter-text {
+  
+  font-size: clamp(17px, 4vw, 20px);
+  color: rgba(255,255,255,0.88);
+  line-height: 2.05; white-space: pre-line;
+}
+.letter-sig {
+  font-family: 'Dancing Script', cursive;
+  font-size: clamp(24px, 6vw, 32px);
+  color: var(--pink); text-align: right; margin-top: 2rem;
+}
+.p6-countdown {
+  margin-top: 2rem; padding: 1.4rem 1.2rem; border-radius: 16px;
+  background: rgba(255,107,157,0.08); border: 1px solid rgba(255,107,157,0.2);
+  text-align: center;
+}
+.cnt-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--dim); margin-bottom: 1rem; display: block; }
+.cnt-row { display: flex; justify-content: center; gap: 22px; }
+.cnt-unit { text-align: center; }
+.cnt-n { font-family: 'Cormorant Garamond', serif; font-size: 34px; font-weight: 600; color: #fff; line-height: 1; }
+.cnt-u { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); margin-top: 4px; display: block; }
+
+/* ══════════════════════════════════
+   SECRET PAGE
+══════════════════════════════════ */
+#p7 {
+  background: radial-gradient(ellipse at 50% 40%, #0a0428 0%, transparent 65%), #020010;
+  justify-content: center;
+}
+.p7-wrap { text-align: center; padding: 2.5rem 1.8rem; max-width: 420px; width: 100%; }
+.p7-stars {
+  font-size: 38px; margin-bottom: 1.5rem;
+  animation: twinkle 2.5s ease-in-out infinite;
+}
+@keyframes twinkle { 0%,100%{opacity:1}50%{opacity:0.45} }
+.p7-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(22px, 5.5vw, 32px); font-weight: 300;
+  color: #fff; margin-bottom: 1.5rem;
+}
+.p7-body {
+  font-size: 15px; color: rgba(195,168,232,0.85);
+  line-height: 1.85; margin-bottom: 2rem;
+}
+.p7-quote {
+  font-family: 'Dancing Script', cursive;
+  font-size: clamp(18px, 4.5vw, 22px);
+  color: var(--pink); line-height: 1.7;
+  margin: 1rem 0;
+}
+
+/* ══════════════════════════════════
+   PAGE FOOTER NAVIGATION
+══════════════════════════════════ */
+.pg-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; justify-content: center; gap: 10px;
+  padding: 10px 0 14px; z-index: 100;
+  background: linear-gradient(transparent, rgba(14,6,24,0.6));
+  pointer-events: none;
+}
+.pg-nav button { pointer-events: all; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,107,157,0.3); border-radius: 3px; }
+
+/* QUIZ score bar at end */
+.score-badge {
+  display: inline-block; padding: 6px 18px; border-radius: 100px;
+  background: rgba(255,107,157,0.15); border: 1px solid rgba(255,107,157,0.3);
+  font-size: 13px; color: var(--blush); margin-bottom: 1.5rem;
+}
+</style>
+</head>
+<body>
+
+<!-- ─── CANVAS LAYERS ─── -->
+<canvas id="canvas-bg"></canvas>
+<canvas id="canvas-confetti"></canvas>
+
+<!-- ─── NAV DOTS (pages 1–6) ─── -->
+
+
+<!-- ─── MUSIC PLAYER ─── -->
+<div id="musicPlayer">
+  <div class="mp-top">
+    <div class="mp-art" id="mpArt">
+      <span id="mpArtEmoji">🎵</span>
+      <div class="mp-art-spin" id="mpSpin"></div>
+    </div>
+    <div class="mp-info">
+      <div class="mp-song"   id="mpSong">Choose a song ♪</div>
+      <div class="mp-artist" id="mpArtist">Your playlist</div>
+    </div>
+    <button class="mp-close" onclick="hidePlayer()" style="background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer;padding:4px;">✕</button>
+  </div>
+
+  <div>
+    <div class="mp-prog-wrap" id="mpProgWrap" onclick="seekTo(event)">
+      <div class="mp-prog-fill" id="mpProg"></div>
+    </div>
+    <div class="mp-times">
+      <span id="mpCur">0:00</span>
+      <span id="mpDur">0:00</span>
+    </div>
+  </div>
+
+  <div class="mp-controls">
+    <button class="mp-ctrl" onclick="prevSong()">&#9664;&#9664;</button>
+    <button class="mp-play" id="mpPlayBtn" onclick="togglePlay()">&#9654;</button>
+    <button class="mp-ctrl" onclick="nextSong()">&#9654;&#9654;</button>
+    <div class="mp-vol">
+      <span class="mp-vol-icon">🔈</span>
+      <input type="range" min="0" max="1" step="0.05" value="0.8" oninput="setVol(this.value)">
+    </div>
+  </div>
+
+  <div class="mp-playlist" id="mpPlaylist"></div>
+</div>
+
+
+<!-- FAB to reopen player -->
+<button id="musicFab" onclick="showPlayer()">♪</button>
+
+
+<!-- ══════════ PAGE 1 — LANDING ══════════ -->
+<div class="page active" id="p1">
+  
+  <div class="p1-wrap pg-in">
+    <div class="p1-heartring">
+      <svg viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="hg" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ff4f87"/>
+            <stop offset="100%" stop-color="#9b4dca"/>
+          </radialGradient>
+        </defs>
+        <path d="M45 75 C45 75 15 55 15 32 C15 21 24 14 33 17 C38 19 42 22 45 27 C48 22 52 19 57 17 C66 14 75 21 75 32 C75 55 45 75 45 75Z" fill="url(#hg)" opacity="0.9"/>
+        <path d="M45 70 C45 70 18 52 18 32 C18 23 26 17 34 20 C39 22 43 25 45 30 C47 25 51 22 56 20 C64 17 72 23 72 32 C72 52 45 70 45 70Z" fill="none" stroke="rgba(255,194,216,0.5)" stroke-width="1"/>
+      </svg>
+    </div>
+
+    <h1 class="p1-title">
+      Happy Birthday<br> my dear potti…
+    </h1>
+    <p class="p1-sub">I love you 🌸</p>
+
+    <div class="p1-input-wrap">
+      <input class="p1-input" id="nameInput" type="text" placeholder="nee name password…" maxlength="30" autocomplete="off">
+    </div>
+    <button class="pill-btn" onclick="checkName()">Heart loki allow cheyi please ✨</button>
+
+    <p class="p1-tease" id="teaseMsg"></p>
+    <p class="p1-secret" id="secretDots" onclick="goTo(7)">· · · · ·</p>
+  </div>
+</div>
+
+<!-- ══════════ PAGE 2 — QUIZ ══════════ -->
+<div class="page" id="p2">
+  <div class="p2-wrap">
+    <div class="p2-progress-bg"><div class="p2-progress-fill" id="qBar" style="width:0%"></div></div>
+    <p class="p2-qcount" id="qCount">Question 1 of 5</p>
+    <h2 class="p2-q" id="qText">Loading…</h2>
+    <div class="p2-opts" id="qOpts"></div>
+    <p class="p2-feedback" id="qFb"></p>
+    <div class="p2-next" id="qNext">
+      <button class="pill-btn" onclick="nextQ()">Continue →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE 3 — MEMORY LANE ══════════ -->
+<div class="page" id="p3">
+  <div id="nav-dots">
+  <div class="dot on"  data-p="1" title="Home"></div>
+  <div class="dot"     data-p="2" title="Quiz"></div>
+  <div class="dot"     data-p="3" title="Memories"></div>
+  <div class="dot"     data-p="4" title="About You"></div>
+  <div class="dot"     data-p="5" title="Surprise"></div>
+  <div class="dot"     data-p="6" title="Letter"></div>
+</div>
+  <div class="p3-wrap">
+    <div class="p3-header">
+      <p class="sec-label">Our Story</p>
+      <h2 class="sec-title">Every chapter is<br><em>my favourite</em></h2>
+    </div>
+    <div id="memTimeline"></div>
+    <div style="text-align:center;margin-top:2rem;">
+      <button class="pill-btn" onclick="goTo(4)">Now let me tell you about you →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE 4 — TEASING ══════════ -->
+<div class="page" id="p4">
+  <div class="p4-wrap">
+    <div class="p4-header">
+      <p class="sec-label">An Honest Review</p>
+      <h2 class="sec-title">All <em>About</em> You</h2>
+    </div>
+
+    <div class="p4-section">
+      <p class="p4-sec-head">❤️ Istalu</p>
+      <div class="cards-grid" id="loveGrid"></div>
+    </div>
+
+    <div class="p4-section">
+      <p class="p4-sec-head">😏 Kastalu</p>
+      <div class="cards-grid" id="roastGrid"></div>
+    </div>
+
+    <div style="text-align:center;margin-top:2.5rem;">
+      <button class="pill-btn" onclick="goTo(5)">I have something for you 🎁</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE 5 — SURPRISE ══════════ -->
+<div class="page" id="p5">
+  <div class="p5-wrap">
+    <p class="p5-pre">✦ The moment ✦</p>
+    <h2 class="sec-title" style="margin-bottom:2rem;text-align:center">One last step…<br><em>just one</em></h2>
+
+    <div id="p5BtnWrap">
+      <button class="p5-bigbtn" onclick="doSurprise()">Click only if you love me ❤️</button>
+      <p class="p5-hint">(Vere option ledu bangaram 😌)</p>
+    </div>
+
+    <div class="p5-reveal" id="p5Reveal">
+      <div class="p5-glow">Happy Birthday! 🎂</div>
+      <p class="p5-msg">
+        You are the best thing<br>
+        that ever happened to me.<br><br>
+        Every single day with you<br>
+        feels like a gift I didn't deserve<br>
+        but somehow got lucky enough<br>
+        to receive.<br><br>
+        I love you more than I know how to say. ❤️
+        English lo undi ani ai anukunev kaadu nene try chesa 😁
+      </p>
+      <button class="pill-btn" onclick="goTo(6)">Read my letter to you →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE 6 — LOVE LETTER ══════════ -->
+ 
+<div class="page" id="p6">
+  <div id="nav-dots">
+  <div class="dot on"  data-p="1" title="Home"></div>
+  <div class="dot"     data-p="2" title="Quiz"></div>
+  <div class="dot"     data-p="3" title="Memories"></div>
+  <div class="dot"     data-p="4" title="About You"></div>
+  <div class="dot"     data-p="5" title="Surprise"></div>
+  <div class="dot"     data-p="6" title="Letter"></div>
+</div>
+  <div class="p6-wrap">
+    <div class="p6-header">
+      <p class="sec-label">Written for you</p>
+      <h2 class="sec-title">A <em>letter</em>,<br>from my heart</h2>
+    </div>
+
+    <div class="letter-card">
+      <p class="letter-stamp" id="letterStamp"></p>
+      <div class="letter-text" id="letterText"></div>
+      <div class="letter-sig">— With everything I have 💕</div>
+    </div>
+
+    <div class="p6-countdown">
+      <span class="cnt-label" id="cntLabel">Until her special day 🎂</span>
+      <div class="cnt-row" id="cntRow"></div>
+    </div>
+
+    <div style="text-align:center;margin-top:2.5rem;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+      <button class="ghost-btn" onclick="goTo(1)">← Back to start</button>
+      <button class="pill-btn" onclick="doSurprise2()">One more celebration 🎉</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE 7 — SECRET ══════════ -->
+<div class="page" id="p7">
+  <div id="nav-dots">
+  <div class="dot on"  data-p="1" title="Home"></div>
+  <div class="dot"     data-p="2" title="Quiz"></div>
+  <div class="dot"     data-p="3" title="Memories"></div>
+  <div class="dot"     data-p="4" title="About You"></div>
+  <div class="dot"     data-p="5" title="Surprise"></div>
+  <div class="dot"     data-p="6" title="Letter"></div>
+</div>
+  <div class="p7-wrap">
+    <div class="p7-stars">🌙 ✨ 🌙</div>
+    <h2 class="p7-title">You found the secret page…</h2>
+    <p class="p7-body">
+      Of course you did. That curious little heart of yours.<br><br>
+      So here — this one's just for this quiet corner:
+    </p>
+    <p class="p7-quote">
+      "Even in a room full of people,<br>
+      I would still find you first."
+    </p>
+    <p class="p7-body" style="margin-top:1rem;">
+      Happy Birthday, my love. 🌙<br>
+      You are more than enough,<br>every single day.
+    </p>
+    <button class="pill-btn" onclick="goTo(1)" style="margin-top:1.5rem;">Back to the beginning ✨</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════ -->
+<script>
+/* ─── CONFIG: Edit these! ─── */
+const GF_NAMES   = [''];     // e.g. ['Priya'] — leave empty to let any name through
+const BDAY_DATE  = '2026-04-18';
+/* ────────────────────────────*/
+
+let CUR = 1;
+let gfName = 'Potti';
+
+/* ─────── FLOATING HEARTS CANVAS ─────── */
+(function(){
+  const C = document.getElementById('canvas-bg');
+  const ctx = C.getContext('2d');
+  let W, H, hearts = [];
+
+  function resize(){
+    W = C.width  = window.innerWidth;
+    H = C.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function makeHeart(){
+    return {
+      x: Math.random() * W,
+      y: H + 30 + Math.random() * H,
+      s: Math.random() * 11 + 5,
+      vy: -(Math.random() * 0.45 + 0.18),
+      vx: (Math.random() - 0.5) * 0.22,
+      op: Math.random() * 0.22 + 0.05,
+      ph: Math.random() * Math.PI * 2
+    };
+  }
+
+  for(let i=0; i<18; i++){
+    const h = makeHeart();
+    h.y = Math.random() * H;
+    hearts.push(h);
+  }
+
+  function drawHeart(ctx, x, y, s, op){
+    ctx.save();
+    ctx.globalAlpha = op;
+    ctx.fillStyle = '#ff6b9d';
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.3);
+    ctx.bezierCurveTo(x, y, x - s * 0.5, y, x - s * 0.5, y + s * 0.3);
+    ctx.bezierCurveTo(x - s * 0.5, y + s * 0.65, x, y + s, x, y + s);
+    ctx.bezierCurveTo(x, y + s, x + s * 0.5, y + s * 0.65, x + s * 0.5, y + s * 0.3);
+    ctx.bezierCurveTo(x + s * 0.5, y, x, y, x, y + s * 0.3);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function tick(){
+    ctx.clearRect(0, 0, W, H);
+    hearts.forEach(h => {
+      h.ph += 0.018;
+      const s = h.s + Math.sin(h.ph) * 1.2;
+      drawHeart(ctx, h.x, h.y, s, h.op);
+      h.y += h.vy;
+      h.x += h.vx;
+      if(h.y < -40){ Object.assign(h, makeHeart()); }
+    });
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+/* ─────── NAVIGATION ─────── */
+function goTo(n, skipAnim){
+  if(n === CUR) return;
+  const fromEl = document.getElementById('p'+CUR);
+  const toEl   = document.getElementById('p'+n);
+  if(!toEl) return;
+
+  fromEl.classList.remove('active');
+  toEl.classList.add('active');
+  if(!skipAnim){ toEl.classList.add('pg-in'); setTimeout(()=>toEl.classList.remove('pg-in'),720); }
+
+  CUR = n;
+  updateDots();
+  onPageEnter(n);
+}
+
+function updateDots(){
+  document.querySelectorAll('.dot').forEach(d => {
+    d.classList.toggle('on', +d.dataset.p === CUR);
+  });
+}
+document.querySelectorAll('.dot').forEach(d => d.addEventListener('click', ()=>goTo(+d.dataset.p)));
+
+function onPageEnter(n){
+  if(n >= 3) initMusicUI();
+  if(n === 2 && qIdx === 0) loadQ();
+  if(n === 3) buildMemories();
+  if(n === 4 && !document.getElementById('loveGrid').children.length) buildCards();
+  if(n === 6){ buildLetter(); buildCountdown(); }
+}
+
+/* ─────── PAGE 1: NAME CHECK ─────── */
+const TEASE = [
+  "Naa pellam peru type cheyi 😌",
+  "Hint kavala, malli try cheyi ista 😏",
+  "Malli try cheyi bangaram",
+  "nek chala istam baby ala piliste…",
+  "Nuvvu baaga wait chestunnav ala official ga andaru ninnu ala pilavadaniki 😌",
+  "alisi poyava, I love you 😘",
+  "nak whatsApp lo msg cheyi cheptha"
+];
+let teaseI = 0;
+
+function checkName(){
+  const val = document.getElementById('nameInput').value.trim();
+  const low = val.toLowerCase();
+  const configured = GF_NAMES.filter(n=>n.length > 0);
+  const match = configured.length === 0 || configured.some(n=>n.toLowerCase()===low);
+  if(match && val.length > 0 && val == 'Mrs Sunidhar'){
+    gfName = val;
+    document.getElementById('teaseMsg').style.color = '#4ecdc4';
+    document.getElementById('teaseMsg').textContent = `Ok, naa heart loki raavochu 💖 Welcome, ${val}…`;
+    setTimeout(()=>goTo(2), 1300);
+  } else if(val.length === 0){
+    document.getElementById('teaseMsg').style.color = 'var(--blush)';
+    document.getElementById('teaseMsg').textContent = 'Athi telivi oddu muskoni name type cheyi 😊';
+  } else {
+    document.getElementById('teaseMsg').style.color = 'var(--blush)';
+    document.getElementById('teaseMsg').textContent = TEASE[teaseI++ % TEASE.length];
+    const inp = document.getElementById('nameInput');
+    inp.style.borderColor = '#ff7b7b';
+    setTimeout(()=>{ inp.style.borderColor = 'rgba(255,107,157,0.3)'; }, 700);
+  }
+}
+document.getElementById('nameInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkName(); });
+
+/* ─────── PAGE 2: QUIZ ─────── */
+const QUESTIONS = [
+  {
+    q: "Manam First time matldukunna place enti? 🌸",
+    opts: ["Classroom", "Lab", "Kc", "Canopy"],
+    correct: 1,  /* ← change index to your answer (0-based) */
+    right: "Abbo great memory 😌✨",
+    wrong:  "Computer lab lo,meedi andhra na ani adiga kada 😒"
+  },
+  {
+    q: "first avaru propose chesaru? 💕",
+    opts: ["Shambhavi", "no option 🤣"],
+    correct: 0,  /* ← change */
+    right: "amma baboi oppukunava greatttt 😍",
+    wrong:  "Joke le, I love you always 😘"
+  },
+  {
+    q: "Neelo nak em istam 🥺",
+    opts: ["nee kallu", "nee character", "nee ...🫣", "nee chilipithanam"],
+    correct: 3,  /* ← change */
+    right: "Deniki answer ledu ammu I Just Love You as a Whole Soul 💖",
+    wrong:  "Deniki answer ledu ammu I Just Love You as a Whole Soul 💖"
+  },
+  {
+    q: "Nen manchi mood lo unte ninnu em ani pilustha 🍬",
+    opts: ["potti", "ammu", "bangaram", "pellam"],
+    correct: 1,  /* ← change */
+    right: "Love you ammu 😘",
+    wrong:  "oops tappu ammu"
+  },
+  {
+    q: "Eppudu pelli chesukundam 🤍",
+    opts: ["Ippude chesuko", "nee istam", "nen chesukonu"],
+    correct: 0,  /* ← change */
+    right: "nak telusu bangaram nee gurinchi ❤️",
+    wrong:  "chesukundam as soon as possible"
+  }
+];
+
+let qIdx = 0, score = 0, qAnswered = false;
+
+function loadQ(){
+  if(qIdx >= QUESTIONS.length){ goTo(3); return; }
+  const q = QUESTIONS[qIdx];
+  document.getElementById('qCount').textContent = `Question ${qIdx+1} of ${QUESTIONS.length}`;
+  document.getElementById('qBar').style.width    = `${(qIdx/QUESTIONS.length)*100}%`;
+  document.getElementById('qText').textContent   = q.q;
+  document.getElementById('qFb').textContent     = '';
+  document.getElementById('qFb').style.color     = '';
+  document.getElementById('qNext').style.display = 'none';
+  qAnswered = false;
+
+  const wrap = document.getElementById('qOpts');
+  wrap.innerHTML = '';
+  q.opts.forEach((opt,i)=>{
+    const b = document.createElement('button');
+    b.className = 'p2-opt'; b.textContent = opt;
+    b.onclick = ()=>answerQ(i);
+    wrap.appendChild(b);
+  });
+}
+
+function answerQ(i){
+  if(qAnswered) return;
+  qAnswered = true;
+  const q = QUESTIONS[qIdx];
+  const btns = document.querySelectorAll('.p2-opt');
+  const fb   = document.getElementById('qFb');
+  if(i === q.correct){
+    score++;
+    btns[i].classList.add('right');
+    fb.style.color = '#4ecdc4';
+    fb.textContent = q.right;
+  } else {
+    btns[i].classList.add('wrong');
+    btns[q.correct].classList.add('right');
+    fb.style.color = '#ff9dc0';
+    fb.textContent = q.wrong;
+  }
+  document.getElementById('qNext').style.display = 'block';
+}
+
+function nextQ(){
+  qIdx++;
+  if(qIdx >= QUESTIONS.length){
+    document.getElementById('qBar').style.width = '100%';
+    setTimeout(()=>goTo(3), 400);
+  } else { loadQ(); }
+}
+
+/* ─────── PAGE 3: MEMORIES ─────── */
+const MEMORIES = [
+  { when:"The beginning",      emo:"🌱", title:"Nenu Ninnu Chusina first time ❤️",        note:"Aa roju rama phone lo nee number tesukoni naa life lone manchi pani chesa nak telikunda. Mana friendship ki seed padindi aa roje",     photo:true , file:"extra1.jpeg" },
+  { when:"Our first Date",     emo:"💬", title:"Yenda lo pichiga prema tho tirigam",        note:"Aroju nen chesina tappu(video call) nak gurthu undi le kani,apart from that nen nek aaroju muddu petta first time 🫣",       photo:true ,file:"photo1.jpeg" },
+  { when:"Our First Kiss",  emo:"🌟", title:"Shock ayya aaroju",    note:"A roju nuvvu muddu petindi nak chala special moment, muddu valla kaadu nuvvu nannu complete ga accept chesi nee vadini anukoni muddu petav nduku",                   photo:true,file:"extra2.jpeg" },
+  { when:"Our Struggle", emo:"🫂", title:"Kasta Kalam lo thodu unnav", note:"Littrelly nen proud ga cheppukunta naa pellam na success ki karunam ani anyday anytime, I am nothing without you potti ❤️",                photo:true ,file:"extra.jpeg" },
+  { when:"Now & always",       emo:"♾️", title:"Exactly year mundu",      note:"Nen nek promise chesa I will be with you for every birthday ani, ippudu nen aa promise nilapetukoleka poya. I hope nen nee pakka unnapudu vache hapiness lo atleast 1% iyna ee gift ne istadi anukuntunna.",                    photo:true ,file:"photo5.jpeg"},
+];
+
+let memBuilt = false;
+function buildMemories(){
+  if(memBuilt) return;
+  memBuilt = true;
+  const tl = document.getElementById('memTimeline');
+  tl.innerHTML = '';
+  MEMORIES.forEach((m,i)=>{
+    const d = document.createElement('div');
+    d.className = 'mem-item';
+    d.innerHTML = `
+      <div class="mem-spine">
+        <div class="mem-dot-outer"><div class="mem-dot-inner"></div></div>
+        ${i<MEMORIES.length-1?'<div class="mem-line"></div>':''}
+      </div>
+      <div class="mem-body">
+        <p class="mem-when">${m.when}</p>
+        <p class="mem-title">${m.title}</p>
+        <p class="mem-note">${m.note}</p>
+        <span class="mem-emo">${m.emo}</span>
+        ${m.photo && m.file ? `<img src="${m.file}" style="width:100%;height:70%;object-fit:cover;border-radius:12px;margin-top:10px;">` : m.photo ? '<div class="mem-photo">📸 add your photo here</div>' : ''}
+      </div>
+    `;
+    tl.appendChild(d);
+    setTimeout(()=>d.classList.add('vis'), i*180+250);
+  });
+}
+
+/* ─────── PAGE 4: LOVE + ROAST CARDS ─────── */
+const LOVE = [
+  {e:'😊', t:'Nee Navvu okkati chalu nen murisipodaniki'},
+  {e:'👀', t:'Asal kallu anta beautiful ga ela untayi'},
+  {e:'🌙', t:'Chandamama lanti mokam'},
+  {e:'💪', t:'Nuvvu nak iche support'},
+  {e:'🎀', t:'Nee values they are above all'},
+  {e:'✨', t:'Nuvvu situations ni handle chese vidanam'},
+];
+const ROAST = [
+  {e:'🤔', t:'Nee overthinking nduku chestavo ento'},
+  {e:'📱', t:'Ureke block chestav'},
+  {e:'😤', t:'Seconds lo mood marchestav'},
+  {e:'🥺', t:'Tempt chesi jaaripotav'},
+];
+
+function buildCards(){
+  const lg = document.getElementById('loveGrid');
+  const rg = document.getElementById('roastGrid');
+  LOVE.forEach(c=>{
+    const d = document.createElement('div'); d.className='lcard';
+    d.innerHTML=`<span class="card-emo">${c.e}</span><p class="card-txt">${c.t}</p>`;
+    lg.appendChild(d);
+  });
+  ROAST.forEach(c=>{
+    const d = document.createElement('div'); d.className='rcard';
+    d.innerHTML=`<span class="card-emo">${c.e}</span><p class="card-txt">${c.t}</p>`;
+    rg.appendChild(d);
+  });
+}
+
+/* ─────── PAGE 5: SURPRISE ─────── */
+function doSurprise(){
+  document.getElementById('p5BtnWrap').style.display = 'none';
+  const rev = document.getElementById('p5Reveal');
+  rev.classList.add('show');
+  startConfetti(300);
+  if(!isPlaying) audio.play().catch(()=>{});
+}
+function doSurprise2(){
+  startConfetti(200);
+}
+
+/* ─────── PAGE 6: LETTER ─────── */
+function buildLetter(){
+  const now = new Date();
+  document.getElementById('letterStamp').textContent =
+    now.toLocaleDateString('en-IN',{year:'numeric',month:'long',day:'numeric'});
+
+  const n = 'Ammu';
+  const txt = `My dearest ${n},
+Ela Start cheyalo telidu ra I MISS YOU A LOT LOT chala ante chala miss you anna words ke edupu vastundi maaku. Nen ninnu happy ga chusukodaniki emi cheyalekapotunna anna feeling aa chala kastam ga undi. Ivvani pakkana pedite manam koddisepu gatham loki poyi vadham.
+
+Naku life lo dorinkina best gift nuvvu be it bestfirend or life partner naa lo prathi part lo nindipoyavu. chala feel avutunna telsa nen nduku ninnu chinnapude kalavadedu ani. And most importantly nak telusu nen mundu vere ammayini muddu petukunna anna feeling ninnu enta badha pedutado.
+
+Birthday roju badhalu pakkaki pedite THANKS FOR EVERYTHING ammu littrelly avariki cheppina nammaru inta manchi ammayi nak pellam iyyindi ante. Nannu day one nunchi okay baby la care tesukunavu tappu cheste amma la tittav nanna la oka dari chupinchav sibling la naa badhalani share chesukunav bestfriend la prathi low lo toduga unnav and finally na wife la nannu ardham chesukuntav. Inni chesina neku nenu badha ni tapppa emi ivvatledu anna feeling nannu chala badha pedutundi.
+
+Nuvvu Nannu enta happy ga chusukuntav nee pakka unte nak prapancham tho pani undadu asaluu naa lo em chusi anta ista padav ammu. naa meda pranam petukunnav ee life ki aa naa pranam neeke. cinema dilouge kadu nannu validesi chudu naa pichi nek ardham avutadi. prathi ammayiki abbayi nuvve naa last love ani cheptadu kani naku nuvvu love kaadu nuvvu na ardhangivi aa sagam ee janma ki neeke. 
+
+Ippudu nen rastundi kuda anta manchiga undaka povachu nduke nek kinda nek nache songs petta plays chesukunta chaduvu boor kottadu.
+
+Recent days lo manaki chala miss understanding vachayi. Ala manam kotadina prathi sari nen ninnu ento miss avuta. 
+
+nee brain lo unna pedda doubt, 'AA ROJU MUNNAR LO ALA JARAGAKUNDA UNDI UNTE NUVVU ILE UNDEVADIVA' nen nee meda ottu esi cheptunna danikanna munde nee meda nak feelings unnayi kani nak nduko adi love ani na past trauma valla nak nen cheppukoleka poya kani nuvvu naa gatham lo unna anni gaayalanu treat chesav nduke adigesa PELLI CHESUKUNTAVA ANI, and damn sure cheptunna mana iddari madya aa physical interaction jaragaka poyina manam pakka okati ayye vallam beacuse DESTINIY ala plan chesindi.
+
+naa life lo nuvve na biggest achivement ammu, nuvvu naa pakkana unte i am the most luckiest man. Mundu mundu enni problems face chestamo telidu kani ninnu vadalanu. Enta kastam iyna parle anadarini opinchi pelli chesukundam. oppukoka pote sachipota ananku vallu oppukune daka vadalakudadu manam.
+
+Chala badha pedutunna ninnu naa lo em worth undo nak telidu.
+Nannu nene validate chesukoleka potunna. Nannu nenu marchukolenu kani nee prema tappakunda marchukuntadi nak aa nammakam undi. 
+
+Sari kattukunte enta andam ga unatavo telsa. Manam relation loki vachaka green sari katukunav gurthunda campus lo aa roju enta murisi poyano na pellani chusi. 
+
+Mana Pelli kosam neeke kaadu naaku aagalenata tondara undi. kani bayata padanu ante avariki undadu cheppu nee lanti pilla 24hrs pakkane undali ani koddiga mental kuda anuko kani nak istam adi kuda.Kala kaala pilla papalatho santhosam ga undu nannu sonthosam ga chusko.
+
+PUTTINA ROJU SHUBHAKAMSHLU SRIMATHI🎂
+
+Nuvve nak anni navvu koddiga cute ga unatv.
+
+and chivariga SORRY naa promise nipetukoleka poya`;
+
+  document.getElementById('letterText').textContent = txt;
+}
+
+function buildCountdown(){
+  const bday = new Date(BDAY_DATE + 'T00:00:00');
+  const now   = new Date();
+  const diff  = bday - now;
+  const row   = document.getElementById('cntRow');
+  const lbl   = document.getElementById('cntLabel');
+  row.innerHTML = '';
+
+  if(diff <= 0){
+    lbl.textContent = "It's HER birthday today! 🎉✨";
+    row.innerHTML = `<div class="cnt-unit"><span class="cnt-n" style="color:var(--gold)">🎉</span><span class="cnt-u">TODAY!</span></div>`;
+  } else {
+    lbl.textContent = "Until her special day 🎂";
+    const d = Math.floor(diff/(1000*60*60*24));
+    const h = Math.floor((diff%(1000*60*60*24))/(1000*60*60));
+    const m = Math.floor((diff%(1000*60*60))/(1000*60));
+    [{v:d,u:'days'},{v:h,u:'hours'},{v:m,u:'mins'}].forEach(x=>{
+      const div = document.createElement('div'); div.className='cnt-unit';
+      div.innerHTML=`<span class="cnt-n">${x.v}</span><span class="cnt-u">${x.u}</span>`;
+      row.appendChild(div);
+    });
+  }
+}
+
+/* ─────── CONFETTI ─────── */
+function startConfetti(secs){
+  const C = document.getElementById('canvas-confetti');
+  C.style.display = 'block';
+  C.width = window.innerWidth; C.height = window.innerHeight;
+  const ctx = C.getContext('2d');
+  const COLS = ['#ff4f87','#9b4dca','#f5c842','#4ecdc4','#ff85b3','#c5a8e8','#fff','#ff7eb3'];
+  const pieces = Array.from({length:140},()=>({
+    x: Math.random()*C.width, y: -20-Math.random()*C.height,
+    w: Math.random()*10+5, h: Math.random()*6+4,
+    color: COLS[Math.floor(Math.random()*COLS.length)],
+    sp: Math.random()*3.5+1.5, r: Math.random()*360, rv: Math.random()*5-2.5
+  }));
+  let f=0, maxF=secs*60/1000*60;
+  function draw(){
+    ctx.clearRect(0,0,C.width,C.height);
+    pieces.forEach(p=>{
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r*Math.PI/180);
+      ctx.fillStyle=p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      ctx.restore();
+      p.y+=p.sp; p.r+=p.rv;
+      if(p.y>C.height+10){ p.y=-20; p.x=Math.random()*C.width; }
+    });
+    f++;
+    if(f<maxF) requestAnimationFrame(draw);
+    else{ ctx.clearRect(0,0,C.width,C.height); C.style.display='none'; }
+  }
+  draw();
+}
+
+/* ─────── MUSIC PLAYER ─────── */
+/*
+  HOW TO REPLACE WITH YOUR SONGS:
+  1. Put your MP3 files next to birthday.html (same folder)
+  2. Update the SONGS array below with the actual filenames
+  Example:
+    { title:'Kesariya', artist:'Arijit Singh', file:'kesariya.mp3', emoji:'🌸' },
+*/
+const SONGS = [
+{ title:'Inkem Inekm Kaavle - Geetha Govindham',        artist:'Sid Sriram',   file:'song6.mp3',  emoji:'🌹' },
+  { title:'Nenu nenu ga lene - Manmadhudu',        artist:'S.P.B.Charan',   file:'song1.mp3',  emoji:'💕' },
+  { title:'Yeto vellipoyindi Manasu - Ninne Pelladatha',           artist:'Rajesh',   file:'song2.mp3',  emoji:'🌸' },
+  { title:'Naa manasuki emiyindi - Nuvve Nuvve',  artist:'Udit Narayan', file:'song3.mp3',  emoji:'🌙' },
+  { title:'Gallo Thelinattudhe - Jalsa',         artist:'Tippu',   file:'song4.mp3',  emoji:'✨' },
+  { title:'Gaaju Bomma - Hi Nanna',        artist:'Hesham Abdul Wahab',   file:'song5.mp3',  emoji:'🌹' },
+  
+];
+
+let audio       = new Audio();
+let curIdx      = 0;
+let isPlaying   = false;
+let progTimer   = null;
+let playerShown = false;
+
+audio.volume = 0.8;
+
+audio.addEventListener('ended', ()=>{ nextSong(); });
+audio.addEventListener('loadedmetadata', ()=>{ updateDur(); });
+audio.addEventListener('timeupdate', ()=>{ updateProgress(); });
+audio.addEventListener('play', ()=>{
+  isPlaying = true;
+  document.getElementById('mpPlayBtn').innerHTML = '&#9646;&#9646;';
+  document.getElementById('mpSpin').classList.add('on');
+});
+audio.addEventListener('pause', ()=>{
+  isPlaying = false;
+  document.getElementById('mpPlayBtn').innerHTML = '&#9654;';
+  document.getElementById('mpSpin').classList.remove('on');
+});
+
+function fmtTime(s){
+  if(isNaN(s)) return '0:00';
+  const m=Math.floor(s/60), sec=Math.floor(s%60);
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+function updateDur(){ document.getElementById('mpDur').textContent = fmtTime(audio.duration); }
+
+function updateProgress(){
+  if(!audio.duration) return;
+  const pct = (audio.currentTime/audio.duration)*100;
+  document.getElementById('mpProg').style.width = pct+'%';
+  document.getElementById('mpCur').textContent = fmtTime(audio.currentTime);
+}
+
+function loadSong(idx, autoPlay){
+  curIdx = ((idx % SONGS.length) + SONGS.length) % SONGS.length;
+  const s = SONGS[curIdx];
+  audio.src = s.file;
+  audio.load();
+  document.getElementById('mpSong').textContent   = s.title;
+  document.getElementById('mpArtist').textContent = s.artist;
+  document.getElementById('mpArtEmoji').textContent = s.emoji;
+  document.getElementById('mpProg').style.width   = '0%';
+  document.getElementById('mpCur').textContent    = '0:00';
+  document.getElementById('mpDur').textContent    = '0:00';
+  // update playlist pills
+  document.querySelectorAll('.mp-pill').forEach((p,i)=> p.classList.toggle('on', i===curIdx));
+  if(autoPlay){ audio.play().catch(()=>{}); }
+}
+
+function togglePlay(){
+  if(audio.src === '' || audio.src === window.location.href){ loadSong(0, true); return; }
+  if(isPlaying) audio.pause();
+  else audio.play().catch(()=>{});
+}
+
+function prevSong(){ loadSong(curIdx-1, isPlaying); }
+function nextSong(){ loadSong(curIdx+1, isPlaying||true); }
+
+function seekTo(e){
+  const wrap = document.getElementById('mpProgWrap');
+  const rect = wrap.getBoundingClientRect();
+  const pct  = Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width));
+  if(audio.duration) audio.currentTime = pct * audio.duration;
+}
+
+function setVol(v){ audio.volume = parseFloat(v); }
+
+function buildPlaylist(){
+  const pl = document.getElementById('mpPlaylist');
+  pl.innerHTML = '';
+  SONGS.forEach((s,i)=>{
+    const pill = document.createElement('button');
+    pill.className = 'mp-pill' + (i===0?' on':'');
+    pill.textContent = s.emoji+' '+s.title;
+    pill.onclick = ()=>{ loadSong(i, true); };
+    pl.appendChild(pill);
+  });
+}
+
+function showPlayer(){
+  buildPlaylist();
+  const p = document.getElementById('musicPlayer');
+  p.classList.add('visible');
+  document.getElementById('musicFab').style.display='none';
+  playerShown = true;
+}
+
+function hidePlayer(){
+  document.getElementById('musicPlayer').classList.remove('visible');
+  document.getElementById('musicFab').style.display='flex';
+}
+
+/* called when entering page 3+ */
+function initMusicUI(){
+  if(playerShown) return;
+  buildPlaylist();
+  showPlayer();
+  loadSong(0, false);
+}
+
+/* keep old toggleMusic reference alive so doSurprise() still works */
+function toggleMusic(){ if(!playerShown){ initMusicUI(); } else togglePlay(); }
+</script>
+</body>
+</html>
